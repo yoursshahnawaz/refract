@@ -1,0 +1,22 @@
+{
+  "agents": {
+    "security":     { "enabled": true,  "weight": 1.5 },
+    "performance":  { "enabled": true,  "weight": 1.2 },
+    "logic":        { "enabled": true,  "weight": 1.3 },
+    "architecture": { "enabled": false },
+    "tests":        { "enabled": true,  "weight": 1.0 }
+  },
+  "quorum": {
+    "threshold": 2
+  },
+  "confidence": {
+    "minDisplay": 0.65,
+    "minCritical": 0.85
+  },
+  "output": {
+    "inline": true,
+    "summary": true,
+    "maxFindings": 15
+  },
+  "model": "claude-opus-4-5"
+}
