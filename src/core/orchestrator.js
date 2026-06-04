@@ -1,12 +1,13 @@
 import pLimit from 'p-limit';
 import { runAgent } from './runner.js';
 import { AGENTS } from '../agents/index.js';
+import { getMockAgentResult } from './mock.js';
 
 /**
  * Orchestrator — runs all enabled agents in parallel, then
  * passes their findings to the Judge for synthesis.
  */
-export async function orchestrate({ diff, meta, config, onProgress }) {
+export async function orchestrate({ diff, meta, config, onProgress, mock = false }) {
   const enabledAgents = Object.entries(config.agents)
     .filter(([, cfg]) => cfg.enabled)
     .map(([name]) => name)
@@ -21,7 +22,9 @@ export async function orchestrate({ diff, meta, config, onProgress }) {
       limit(async () => {
         onProgress?.({ stage: 'running', agent: name });
         try {
-          const result = await runAgent({ agent: AGENTS[name], diff, meta, config });
+          const result = mock
+            ? getMockAgentResult(name)
+            : await runAgent({ agent: AGENTS[name], diff, meta, config });
           onProgress?.({ stage: 'done', agent: name });
           return { name, result, error: null };
         } catch (err) {
@@ -36,13 +39,9 @@ export async function orchestrate({ diff, meta, config, onProgress }) {
 
   onProgress?.({ stage: 'judging' });
 
-  const verdict = await runAgent({
-    agent: AGENTS.judge,
-    diff,
-    meta,
-    config,
-    context: successful,
-  });
+  const verdict = mock
+    ? getMockAgentResult('judge')
+    : await runAgent({ agent: AGENTS.judge, diff, meta, config, context: successful });
 
   return { agentResults: successful, verdict, meta };
 }

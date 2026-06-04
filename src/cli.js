@@ -29,11 +29,12 @@ program
   .option('--post', 'Post results as GitHub PR comments')
   .option('--repo <owner/repo>', 'GitHub repo (defaults to current repo)')
   .option('--json', 'Output raw JSON instead of formatted output')
+  .option('--mock', 'Run with mock responses (no API key needed — for testing)')
   .option('--config <path>', 'Path to config file (default: .refract.json)')
   .action(async (opts) => {
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!opts.mock && !process.env.ANTHROPIC_API_KEY) {
       console.error(chalk.red('\n  ✗ ANTHROPIC_API_KEY environment variable is not set.'));
-      console.error(chalk.dim('  Create a .env file or export the variable and try again.\n'));
+      console.error(chalk.dim('  Create a .env file, export the variable, or use --mock to test without an API key.\n'));
       process.exit(1);
     }
 
@@ -51,6 +52,10 @@ program
 
     console.log();
 
+    if (opts.mock) {
+      console.log(chalk.dim('  ⚠  Mock mode — responses are simulated, no API key used\n'));
+    }
+
     let reviewResult;
     try {
       reviewResult = await orchestrate({
@@ -58,6 +63,7 @@ program
         meta: diffData.meta,
         config,
         onProgress: renderProgress,
+        mock: !!opts.mock,
       });
     } catch (err) {
       console.error(chalk.red('\n  ✗ Review failed: ' + err.message));
