@@ -16,6 +16,19 @@ PR Diff
 
 ---
 
+## Try it instantly (no API key needed)
+
+```bash
+git clone https://github.com/yoursshahnawaz/refract
+cd refract
+npm install
+node test/run-sample.js --mock
+```
+
+This runs Refract against a sample auth file packed with real vulnerabilities and shows the full output.
+
+---
+
 ## Features
 
 - **Parallel execution** — all agents run simultaneously, results in seconds
@@ -95,50 +108,101 @@ jobs:
 
 ## Sample Output
 
+The following is a real review of a Node.js auth file with intentional vulnerabilities (see [`test/sample/`](test/sample/)):
+
 ```
+  ⚠  Mock mode — no API key detected, using simulated responses
+
+  Running security agent...     ✓
+  Running performance agent...  ✓
+  Running logic agent...        ✓
+  Running architecture agent... ✓
+  Running tests agent...        ✓
+
+  Judge synthesizing findings...
+
 ────────────────────────────────────────────────────────────
   REFRACT — Multi-Agent Code Review
 ────────────────────────────────────────────────────────────
 
-  PR: Fix user authentication flow
-  Changes: +127 -43
+  PR: feat: refactor auth routes with user enrichment
+  Changes: +79 -6
 
   Agents
-  ✓ security        Hardcoded fallback secret detected
-  ✓ performance     One N+1 query found in user fetch loop
-  ✓ logic           Async error path not handled
-  ✓ architecture    Auth logic mixed with controller
-  ✓ tests           Missing tests for error paths
+  ✓ security       Critical: SQL injection, hardcoded secret, plain-text
+                   password storage, sensitive data logged and leaked
+  ✓ performance    N+1 query on user fetch, O(n²) tag deduplication,
+                   unused lodash import
+  ✓ logic          Auth bypass via missing await (every /admin request
+                   passes), plain-text password comparison, no input validation
+  ✓ architecture   Register route violates SRP, JWT secret duplicated
+                   three times across the file
+  ✓ tests          Zero test coverage on all three new endpoints including
+                   the critical auth bypass route
 
-  Score ████████████░░░░░░░░ 62/100
+  Score ████░░░░░░░░░░░░░░░░ 18/100
 
-  🔄  REQUEST CHANGES
-  Three issues warrant attention before merging: a critical secret
-  exposure, an unhandled async error, and an N+1 query pattern.
+  🚫  BLOCKED
+  This PR must not be merged. It introduces an authentication bypass
+  that grants every user admin access, stores passwords in plain text,
+  and has a SQL injection vulnerability. These are not theoretical
+  risks — they are exploitable in production as written.
 
 ────────────────────────────────────────────────────────────
-  Findings (3)
+  Findings (7)
 
-  🔴 CRITICAL  ⬡ QUORUM [security, logic]  97% confidence
-  JWT secret falls back to hardcoded string
-  src/auth/token.js:34
-  When JWT_SECRET env var is missing the code falls back to the
-  string "secret", exposing all tokens in production.
-  → if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is required')
+  🔴 CRITICAL  ⬡ QUORUM  [logic, security]  99% confidence
+  Auth bypass — missing await makes every /admin request succeed
+  src/routes/auth.js:25
+  verifyToken() is async but called without await, returning a truthy
+  Promise. Every request to /admin passes regardless of token validity.
+  → Add async to route handler and await verifyToken(token)
 
-  🟠 HIGH   [performance]  84% confidence
-  N+1 query inside user fetch loop
-  src/api/users.js:112
-  user.profile is fetched inside a loop — one DB query per user.
-  → Use eager loading: User.findAll({ include: Profile })
+  🔴 CRITICAL  [security]  98% confidence
+  SQL injection via role query parameter
+  src/routes/auth.js:12
+  Raw string interpolation of user input into SQL query allows full
+  database compromise.
+  → db.query("SELECT * FROM users WHERE role = ?", [role])
 
-  🟡 MEDIUM  [logic]  79% confidence
-  Unhandled promise rejection in auth middleware
-  src/middleware/auth.js:67
-  verifyToken() can throw but is not in a try/catch.
-  → Wrap in try/catch or add .catch() to handle token errors
+  🔴 CRITICAL  ⬡ QUORUM  [security, logic]  97% confidence
+  Passwords stored and compared in plain text
+  src/routes/auth.js:58
+  Plain-text password storage means a single DB breach exposes every
+  user credential.
+  → bcrypt.hash(password, 12) on register, bcrypt.compare() on login
+
+  🔴 CRITICAL  [security]  97% confidence
+  Hardcoded JWT fallback secret
+  src/routes/auth.js:34
+  Fallback to "mysecretkey123" means tokens can be forged in any
+  environment missing the env var.
+  → Throw if JWT_SECRET is not set — never fall back to a hardcoded value
+
+  🟠 HIGH      [performance]  95% confidence
+  N+1 query in /users route
+  src/routes/auth.js:16
+  One DB query per user in a loop. Fetch all profiles in a single
+  IN query instead.
+  → db.query("SELECT * FROM profiles WHERE user_id IN (?)", [userIds])
+
+  🟠 HIGH      [security]  95% confidence
+  Sensitive data logged and leaked in API response
+  src/routes/auth.js:38
+  Full user object including password written to logs and returned
+  in register response.
+  → const { password, ...safeUser } = user
+
+  🟡 MEDIUM    [logic]  85% confidence
+  No input validation on register endpoint
+  src/routes/auth.js:49
+  Null or undefined inputs pass straight to the database.
+  → Validate all required fields before processing the request
+
 ────────────────────────────────────────────────────────────
 ```
+
+> Try it yourself: `node test/run-sample.js --mock` — no API key needed.
 
 ---
 
