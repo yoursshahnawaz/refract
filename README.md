@@ -16,19 +16,6 @@ PR Diff
 
 ---
 
-## Try it instantly (no API key needed)
-
-```bash
-git clone https://github.com/yoursshahnawaz/refract
-cd refract
-npm install
-node test/run-sample.js --mock
-```
-
-This runs Refract against a sample auth file packed with real vulnerabilities and shows the full output.
-
----
-
 ## Features
 
 - **Parallel execution** — all agents run simultaneously, results in seconds
@@ -108,11 +95,7 @@ jobs:
 
 ## Sample Output
 
-The following is a real review of a Node.js auth file with intentional vulnerabilities (see [`test/sample/`](test/sample/)):
-
 ```
-  ⚠  Mock mode — no API key detected, using simulated responses
-
   Running security agent...     ✓
   Running performance agent...  ✓
   Running logic agent...        ✓
@@ -201,8 +184,6 @@ The following is a real review of a Node.js auth file with intentional vulnerabi
 
 ────────────────────────────────────────────────────────────
 ```
-
-> Try it yourself: `node test/run-sample.js --mock` — no API key needed.
 
 ---
 
